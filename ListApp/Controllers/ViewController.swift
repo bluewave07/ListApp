@@ -6,13 +6,14 @@
 //
 
 import UIKit
+import CoreData
 
 class ViewController: UIViewController {
     
     
     
     var alertController = UIAlertController()
-    var data = [String]()
+    var data = [NSManagedObject]()
     
     
     @IBOutlet weak var tableView: UITableView!
@@ -22,6 +23,8 @@ class ViewController: UIViewController {
         super.viewDidLoad()
         tableView.delegate = self
         tableView.dataSource = self
+        fetch()
+        
     }
     
     
@@ -52,13 +55,23 @@ class ViewController: UIViewController {
                      defaultButtonHandler: {_ in
             let text = self.alertController.textFields?.first?.text
             if text != "" {
-                self.data.append((text)!)
-                self.tableView.reloadData()
+                //self.data.append((text)!)
+                let appDelegate = UIApplication.shared.delegate as? AppDelegate
+                
+                let managedObjectContect = appDelegate?.persistentContainer.viewContext
+                
+                let entity = NSEntityDescription.entity(forEntityName: "Listitem", in: managedObjectContect!)
+                let listItem = NSManagedObject(entity: entity!, insertInto: managedObjectContect)
+                
+                listItem.setValue(text, forKey: "title")
+                try? managedObjectContect?.save()
+                
+                self.fetch()
             }else{
                 self.presentWarningAlert()
             }
         })
-        
+      
     }
     
     func presentWarningAlert(){
@@ -94,6 +107,18 @@ class ViewController: UIViewController {
         alertController.addAction(cancelButton)
         self.present(alertController, animated: true)
     }
+    
+    func fetch() {
+        let appDelegate = UIApplication.shared.delegate as? AppDelegate
+        
+        let managedObjectContect = appDelegate?.persistentContainer.viewContext
+        
+        let fetchRequest = NSFetchRequest<NSManagedObject>(entityName: "Listitem")
+        
+        data = try! managedObjectContect!.fetch(fetchRequest)
+        
+        tableView.reloadData()
+    }
 }
 
 
@@ -108,7 +133,10 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource{
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         
         let cell = tableView.dequeueReusableCell(withIdentifier: "defaultCell", for: indexPath)
-        cell.textLabel?.text = data[indexPath.row]
+        
+        let listItem = data[indexPath.row]
+        
+        cell.textLabel?.text = listItem.value(forKey: "title") as? String
         return cell
     }
     
@@ -118,7 +146,15 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource{
         
         let deleteAction = UIContextualAction(style: .normal, title: "Sil") {_, _, _ in
             
-            self.data.remove(at: indexPath.row)
+
+            let appDelegate = UIApplication.shared.delegate as? AppDelegate
+            
+            let managedObjectContect = appDelegate?.persistentContainer.viewContext
+            
+            managedObjectContect?.delete(self.data[indexPath.row])
+            try? managedObjectContect?.save()
+            self.fetch()
+            
             tableView.reloadData()
         }
         
@@ -133,7 +169,14 @@ extension ViewController: UITableViewDelegate, UITableViewDataSource{
                               defaultButtonHandler: {_ in
                 let text = self.alertController.textFields?.first?.text
                 if text != "" {
-                    self.data[indexPath.row] = text!
+                  
+                    let appDelegate = UIApplication.shared.delegate as? AppDelegate
+                    
+                    let managedObjectContect = appDelegate?.persistentContainer.viewContext
+                    self.data[indexPath.row].setValue(text, forKey: "title")
+                    if managedObjectContect!.hasChanges{
+                        try? managedObjectContect?.save()
+                    }
                     self.tableView.reloadData()
                 }else{
                     self.presentWarningAlert()
